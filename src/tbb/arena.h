@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -22,6 +23,7 @@
 
 #include "oneapi/tbb/detail/_task.h"
 #include "oneapi/tbb/detail/_utils.h"
+#include "oneapi/tbb/global_control.h"
 #include "oneapi/tbb/spin_mutex.h"
 
 #include "scheduler_common.h"
@@ -48,6 +50,8 @@ class allocate_root_with_context_proxy;
 #if __TBB_ARENA_BINDING
 class numa_binding_observer;
 #endif /*__TBB_ARENA_BINDING*/
+
+std::size_t global_control_active_value_unsafe(d1::global_control::parameter);
 
 //! Bounded coroutines cache LIFO ring buffer
 class arena_co_cache {
@@ -192,7 +196,8 @@ public:
     // Required to be called after construction to set initial state of the state machine.
     void set_initial_state(tbb::task_arena::leave_policy lp) {
         if (lp == tbb::task_arena::leave_policy::automatic) {
-            std::uintptr_t platform_policy = governor::hybrid_cpu() ? FAST_LEAVE : DELAYED_LEAVE;
+            bool fast_leave = (global_control_active_value_unsafe(global_control::fast_leave) == 1);
+            std::uintptr_t platform_policy = (fast_leave || governor::hybrid_cpu()) ? FAST_LEAVE : DELAYED_LEAVE;
             my_state.store(platform_policy, std::memory_order_relaxed);
         } else {
             __TBB_ASSERT(lp == tbb::task_arena::leave_policy::fast,
